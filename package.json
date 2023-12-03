@@ -14,6 +14,7 @@
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.14.0",
     "puppeteer": "^21.5.2",
+    "readline-sync": "^1.4.10",
     "request": "^2.88.2",
     "request-promise-native": "^1.0.9"
   }

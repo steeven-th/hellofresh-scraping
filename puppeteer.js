@@ -1,16 +1,26 @@
 import puppeteer from 'puppeteer';
 import request from 'request';
-import { scrapeTitle, scrapImage } from './header.js';
-import { scrapeInformations } from './informations.js';
-import { scrapeIngredients } from './ingredients.js';
-import { scrapeUstensils } from './ustensils.js';
-import { scrapeSteps } from './steps.js';
+import readlineSync from 'readline-sync'
+import {scrapeTitle, scrapImage} from './header.js';
+import {scrapeInformations} from './informations.js';
+import {scrapeIngredients} from './ingredients.js';
+import {scrapeUstensils} from './ustensils.js';
+import {scrapeSteps} from './steps.js';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
+
+// Function to get URL from user input
+function getURLFromUser() {
+     // Demande à l'utilisateur d'entrer l'URL
+    return readlineSync.question('Entrez l\'URL : ');
+}
 
 // Because everything in Puppeteer is asynchronous,
 // we wrap all of our code inside of an async IIFE
 (async () => {
+
+    // Get URL from user input
+    const url = getURLFromUser();
 
     // Colors for the PDF
     const firstGreen = '#e6efc5';
@@ -25,7 +35,7 @@ import PDFDocument from 'pdfkit';
     const page = await browser.newPage();
 
     // Go to URL
-    await page.goto("https://www.hellofresh.fr/recipes/bowl-de-saumon-teriyaki-and-avocat-64fae7c632e9107c6db86ea7");
+    await page.goto(url);
 
     // Set screen size
     await page.setViewport({ width: 1080, height: 1024 });
@@ -57,19 +67,17 @@ import PDFDocument from 'pdfkit';
     const doc = new PDFDocument({
         layout: 'landscape', // Set layout to landscape
         size: 'letter',       // Set paper size to letter
+        margins: {
+            top: 20,
+            bottom: 20,
+            left: 50,
+            right: 50
+        }
     });
 
     // Pipe the PDF content to a writable stream
     const stream = fs.createWriteStream('output.pdf');
     doc.pipe(stream);
-
-    doc.margins = { top: 0, bottom: 0, left: 0, right: 0 };
-
-    // Function to add a new page with content
-    function addPageWithContent(content) {
-        doc.addPage(); // Add a new page
-        doc.text(content, 50, 50); // Add content to the page
-    }
 
     function downloadImage(url) {
         return new Promise((resolve, reject) => {
@@ -118,7 +126,7 @@ import PDFDocument from 'pdfkit';
             datas.informations.forEach((info) => {
                 const key = Object.keys(info)[0];
                 const value = info[key];
-                doc.fontSize(8).text(`${key}: ${value}`, {indent: 25});
+                doc.fontSize(8).text(`${key}: ${value}`, {indent: 0});
             });
         }
 
@@ -175,7 +183,7 @@ import PDFDocument from 'pdfkit';
             doc.moveDown(); // Move down after the section title
 
             datas.ustensils.forEach((ustensil) => {
-                doc.fontSize(8).text(ustensil, {continued: false, indent: 25});
+                doc.fontSize(8).text(ustensil, {continued: false, indent: 0});
             });
 
             doc.moveDown(); // Move down after the ustensils section

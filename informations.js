@@ -3,11 +3,20 @@ export async function scrapeInformations(page) {
 
     // ATTENTION : ne fonctionne que si { headless: false } est activé dans le launch de puppeteer
 
-    const buttonFor2Portions = await page.$('[aria-label="2"]');
-    await buttonFor2Portions.click();
+    const buttonFor100g = await page.$('[aria-label="per-100g"]', { visible: true });
 
-    const buttonFor100g = await page.$('[aria-label="per-100g"]');
-    await buttonFor100g.click();
+    if (buttonFor100g) {
+        buttonFor100g.click();
+        await page.waitForTimeout(1000);
+        buttonFor100g.click();
+    }
+
+    // const buttonFor2Portions = await page.$('[aria-label="2"]');
+    const buttonFor2Portions = await page.$('[aria-label="2"]');
+
+    if (buttonFor2Portions) {
+        buttonFor2Portions.click();
+    }
 
     const elmtInformations = await page.$$('.kimgtP');
     const informations = [];
