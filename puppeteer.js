@@ -1,9 +1,23 @@
-const puppeteer = require("puppeteer");
-const request = require("request");
+import puppeteer from 'puppeteer';
+import request from 'request';
+import { scrapeTitle, scrapImage } from './header.js';
+import { scrapeInformations } from './informations.js';
+import { scrapeIngredients } from './ingredients.js';
+import { scrapeUstensils } from './ustensils.js';
+import { scrapeSteps } from './steps.js';
+import fs from 'fs';
+import PDFDocument from 'pdfkit';
 
 // Because everything in Puppeteer is asynchronous,
 // we wrap all of our code inside of an async IIFE
 (async () => {
+
+    // Colors for the PDF
+    const firstGreen = '#e6efc5';
+    const secondGreen = '#8fc84e';
+    const thirdGreen = '#5e9f43';
+
+
     // Launch Puppeteer
     const browser = await puppeteer.launch({ headless: false });
 
@@ -39,9 +53,6 @@ const request = require("request");
 
     await browser.close();
 
-    const fs = require('fs');
-    const PDFDocument = require('pdfkit');
-
     // Create a PDF document
     const doc = new PDFDocument({
         layout: 'landscape', // Set layout to landscape
@@ -73,18 +84,20 @@ const request = require("request");
         });
     }
 
-    async function addFirstPageContent(datas) {
+    async function pageContent(datas) {
 
         // Add title to the first page
         if (datas.title) {
-            doc.fontSize(18).text(datas.title, 340, 20, { width: 400, align: 'left', continued: false, indent: 0 });
+            doc.fillColor(thirdGreen).fontSize(18).text(datas.title, 340, 20, { width: 400, align: 'left', continued: false, indent: 0 });
         }
+
+        doc.fillColor('#000000');
 
         // Add image to the first page
         if (datas.image) {
             try {
                 const imageData = await downloadImage(datas.image);
-                doc.image(imageData, 340, 60, { width: 400 });
+                doc.image(imageData, 340, 60, { width: 425 });
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -93,63 +106,131 @@ const request = require("request");
         // Add information to the first page
         if (datas.informations && datas.informations.length > 0) {
 
-            doc.strokeColor('#228800').lineWidth(2); // Red color
+            doc.strokeColor(secondGreen).lineWidth(2); // Red color
 
             // Draw a rectangle around the text
-            doc.rect(20, 20, 300, 225).stroke();
+            // doc.rect(20, 20, 300, 130).stroke();
+            doc.rect(340, 355, 210, 150).stroke();
 
-            doc.fontSize(14).text('Informations:', 25, 25, {continued: false, indent: 0});
+            doc.fontSize(10).text('Informations:', 345, 360, {continued: false, indent: 0});
             doc.moveDown(); // Move down after the section title
 
             datas.informations.forEach((info) => {
                 const key = Object.keys(info)[0];
                 const value = info[key];
-                doc.text(`${key}: ${value}`, {indent: 25});
+                doc.fontSize(8).text(`${key}: ${value}`, {indent: 25});
             });
         }
 
         // Add ingredients to the first page
         if (datas.ingredients && datas.ingredients.length > 0) {
 
-            doc.strokeColor('#228800').lineWidth(2); // Red color
+            doc.strokeColor(secondGreen).lineWidth(2); // Red color
 
             // Draw a rectangle around the text
-            doc.rect(20, 250, 300, 340).stroke();
+            // doc.rect(20, 155, 300, 340).stroke();
+            doc.rect(20, 20, 300, 570).stroke();
 
-            doc.fontSize(14).text('Ingrédients:', 25, 255, {continued: false, indent: 0});
+            doc.fontSize(10).text('Ingrédients pour 2 personnes:', 25, 25, {continued: false, indent: 0});
             doc.moveDown(); // Move down after the section title
 
-            datas.ingredients.forEach((ingredient) => {
-                const key = Object.keys(ingredient)[0];
-                const value = ingredient[key];
-                doc.text(`${key}: ${value}`, {continued: false, indent: 25});
-            });
+            const downloadAndAddImage = async (imageURL) => {
+                const imageData = await downloadImage(imageURL);
+                doc.image(imageData, { width: 25 });
+            };
+
+            const processIngredients = async () => {
+                let isFirstIteration = true;
+
+                for (const ingredient of datas.ingredients) {
+                    const key = Object.keys(ingredient)[0];
+                    const value = ingredient[key];
+                    await downloadAndAddImage(`${value[0]}`);// Appel de la fonction asynchrone pour le téléchargement de l'image
+
+                    if (!isFirstIteration) {
+                        doc.moveUp().moveUp() // Move up to the top of the image
+                    } else {
+                        doc.moveUp();
+                        isFirstIteration = false;
+                    }
+
+                    doc.fontSize(8).text(`${key}: ${value[1]}`, { continued: false, indent: 35 });
+                    doc.moveDown(); // Move down after the ingredient
+                }
+            };
+
+            await processIngredients();
         }
 
         // Add ustensils to the first page
         if (datas.ustensils && datas.ustensils.length > 0) {
 
-            doc.strokeColor('#228800').lineWidth(2); // Red color
+            doc.strokeColor(secondGreen).lineWidth(2); // Red color
 
             // Draw a rectangle around the text
-            doc.rect(340, 350, 300, 240).stroke();
+            // doc.rect(340, 350, 300, 240).stroke();
+            doc.rect(555, 355, 210, 150).stroke();
 
-            doc.fontSize(14).text('Ustensils:', 345, 355, {continued: true});
-            doc.moveDown().moveDown(); // Move down after the section title
+            doc.fontSize(10).text('Ustensils:', 560, 360, {continued: false});
+            doc.moveDown(); // Move down after the section title
 
             datas.ustensils.forEach((ustensil) => {
-                doc.text(ustensil, {continued: false, indent: 25});
+                doc.fontSize(8).text(ustensil, {continued: false, indent: 25});
             });
 
             doc.moveDown(); // Move down after the ustensils section
         }
+
+        doc.addPage(); // Add a new page
+
+        // Add steps to the second page
+        if (datas.steps && datas.steps.length > 0) {
+
+            doc.strokeColor(secondGreen).lineWidth(2); // Red color
+
+            // Draw a rectangle around the text
+            // doc.rect(20, 20, 620, 570).stroke();
+            doc.rect(20, 20, 745, 570).stroke();
+
+            doc.fontSize(10).text('Préparation:', 25, 25, {continued: false});
+            doc.moveDown(); // Move down after the section title
+
+            const downloadAndAddImage = async (imageURL, y) => {
+                const imageData = await downloadImage(imageURL);
+                doc.image(imageData, 25, y, { width: 100 });
+            };
+
+            const processSteps = async () => {
+                let loop = 1;
+                let nextY = doc.y;
+
+                for (const step of datas.steps) {
+                    const key = Object.keys(step)[0];
+                    const value = step[key];
+
+                    if (loop > 1) {
+                        nextY = nextY + 90;
+                        loop++;
+                    } else {
+                        loop++;
+                    }
+
+                    if (value.img) {
+                        await downloadAndAddImage(value.img, nextY);
+                    }
+
+                    // doc.fontSize(8).text(loop-1 + ':', 130, nextY, {continued: false, indent: 0});
+
+                    doc.fontSize(8).text(value.description, 130, nextY, {continued: false, indent: 0});
+                }
+            };
+
+            await processSteps();
+        }
     }
 
     // Add content to the first page
-    await addFirstPageContent(datas);
-
-    // Add content to the second page
-    addPageWithContent('Page 2 Content');
+    await pageContent(datas);
 
     // Save the PDF
     doc.end();
@@ -159,112 +240,3 @@ const request = require("request");
         console.log('PDF created successfully.');
     });
 })();
-
-// Function to scrape Hero image
-async function scrapImage(page) {
-    const elmtImage = await page.$('.KGVMo');
-
-    return await elmtImage.$eval('img', node => node.src);
-}
-
-// Function to scrape title
-async function scrapeTitle(page) {
-    const elmtTitle = await page.$('.jeetYO');
-
-    const h1 = await elmtTitle.$eval('h1', node => node.textContent);
-    const h2 = await elmtTitle.$eval('h2', node => node.textContent);
-
-    return h1 + ' ' + h2;
-}
-
-// Function to scrape preparation time
-async function scrapeInformations(page) {
-
-    // ATTENTION : ne fonctionne que si { headless: false } est activé dans le launch de puppeteer
-
-        const buttonFor2Portions = await page.$('[aria-label="2"]');
-        await buttonFor2Portions.click();
-
-    // Si l'url est en .fr
-    if (page.url().includes('.fr')) {
-        const buttonFor100g = await page.$('[aria-label="per-100g"]');
-        await buttonFor100g.click();
-    }
-    const elmtInformations = await page.$$('.kimgtP');
-    const informations = [];
-
-    for (const elmt of elmtInformations) {
-        const title = await elmt.$eval('.kUCRYF', node => node.textContent);
-        const info = await elmt.$eval('.eZjiGJ', node => node.textContent);
-
-        const information = {};
-        information[title] = info;
-        informations.push(information);
-    }
-
-    return informations;
-}
-
-// Function to scrape ingredients from an element
-async function scrapeIngredients(page) {
-
-    // ATTENTION : ne fonctionne que si { headless: false } est activé dans le launch de puppeteer
-    const buttonFor2Portions = await page.$('[aria-label="2"]');
-    await buttonFor2Portions.click();
-
-    const elmtIngredients = await page.$$('.eOyORz');
-    const ingredients = [];
-
-    for (const elmt of elmtIngredients) {
-        const subElmts = await elmt.$$('*');
-
-        for (const subElmt of subElmts) {
-            const p = await subElmt.$$('p');
-
-            if (p.length) {
-                const ingredient = await p[1].evaluate(node => node.textContent);
-                const ingredientQty = await p[0].evaluate(node => node.textContent);
-
-                const ingredientData = {};
-                ingredientData[ingredient] = ingredientQty;
-                ingredients.push(ingredientData);
-            }
-        }
-    }
-
-    return ingredients;
-}
-
-// Function to scrape preparation ustensils
-async function scrapeUstensils(page) {
-    const ustensilsDatas = await page.$('[data-test-id="utensils"]');
-    const elmtUstensils = await ustensilsDatas.$$('.fivcnB');
-    const ustensils = [];
-
-    for (const elmt of elmtUstensils) {
-        const ustensil = await elmt.evaluate(node => node.textContent);
-        ustensils.push(ustensil);
-    }
-
-    return ustensils;
-}
-
-// Function to scrape preparation steps
-async function scrapeSteps(page) {
-    const stepsDatas = await page.$('[data-test-id="instructions"]');
-    const elmtSteps = await stepsDatas.$$('.ewFuly');
-
-    const steps = [];
-    let i = 0;
-    for (const elmt of elmtSteps) {
-        const img = await elmt.$eval('img', img => img.getAttribute('src'));
-        const description = await elmt.$eval('ul', ul => ul.textContent);
-
-        const step = {};
-        step[i] = { img, description };
-        steps.push(step);
-        i++;
-    }
-
-    return steps;
-}
