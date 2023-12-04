@@ -1,1 +1,2 @@
-npm install puppeteer
+npm install
+node puppeteer.js
